@@ -1,18 +1,21 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.db import get_db
 from backend.dependencies import get_current_user
+from backend.limiter import limiter
 from backend.models.file import File, FileAccessLog
 from backend.models.user import User
 from backend.services import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Autenticação"])
+_bearer = HTTPBearer()
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -68,6 +71,15 @@ class Verify2FARequest(BaseModel):
     totp_code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=12, max_length=128)
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
@@ -99,10 +111,16 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) ->
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """Etapa 1 — verifica e-mail e senha, retorna token temporário (3 min)."""
+@limiter.limit("5/minute")
+async def login(
+    request: Request,
+    body: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Etapa 1 — verifica e-mail e senha, retorna token temporário (3 min). Limite: 5/min por IP."""
+    ip = request.client.host if request.client else None
     try:
-        temp_token = await auth_service.login_user(email=body.email, password=body.password, db=db)
+        temp_token = await auth_service.login_user(email=body.email, password=body.password, db=db, ip_address=ip)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -130,13 +148,20 @@ async def setup_2fa(body: Setup2FARequest, db: AsyncSession = Depends(get_db)) -
 
 
 @router.post("/2fa/verify", response_model=TokenResponse)
-async def verify_2fa(body: Verify2FARequest, db: AsyncSession = Depends(get_db)) -> TokenResponse:
-    """Etapa 2 — valida o código TOTP e retorna o JWT final de acesso."""
+@limiter.limit("5/minute")
+async def verify_2fa(
+    request: Request,
+    body: Verify2FARequest,
+    db: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """Etapa 2 — valida o código TOTP e retorna o JWT final de acesso. Limite: 5/min por IP."""
+    ip = request.client.host if request.client else None
     try:
         access_token = await auth_service.verify_2fa_and_issue_token(
             temp_token=body.temp_token,
             totp_code=body.totp_code,
             db=db,
+            ip_address=ip,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -146,6 +171,63 @@ async def verify_2fa(body: Verify2FARequest, db: AsyncSession = Depends(get_db))
         )
 
     return TokenResponse(token=access_token, message="2FA verificado. Autenticação completa.")
+
+
+@router.post("/forgot-password")
+@limiter.limit("3/minute")
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Solicita recuperação de senha. Resposta idêntica para e-mails válidos e inválidos.
+
+    Em produção o token deve ser enviado por e-mail — nunca exposto na resposta.
+    O campo reset_token é retornado apenas neste ambiente de desenvolvimento/avaliação.
+    """
+    ip = request.client.host if request.client else None
+    reset_token = await auth_service.request_password_reset(email=body.email, db=db, ip_address=ip)
+    response: dict = {
+        "message": "Se o e-mail estiver cadastrado, você receberá as instruções de recuperação.",
+    }
+    if reset_token:
+        response["reset_token"] = reset_token  # remover em produção — enviar por e-mail
+    return response
+
+
+@router.post("/reset-password")
+@limiter.limit("5/minute")
+async def reset_password_endpoint(
+    request: Request,
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Aplica nova senha usando o token temporário. Token é invalidado após uso."""
+    ip = request.client.host if request.client else None
+    try:
+        await auth_service.reset_password(
+            token=body.token,
+            new_password=body.new_password,
+            db=db,
+            ip_address=ip,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    return {"message": "Senha alterada com sucesso. Faça login com a nova senha."}
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Invalida o token atual. O token não pode ser reutilizado mesmo antes de expirar."""
+    ip = request.client.host if request.client else None
+    try:
+        await auth_service.logout_user(token=credentials.credentials, db=db, ip_address=ip)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
 
 
 @router.get("/me", response_model=MeResponse)

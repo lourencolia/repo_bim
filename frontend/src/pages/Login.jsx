@@ -126,6 +126,15 @@ export default function Login() {
               />
             </div>
 
+            <div style={{ textAlign: 'right', margin: '-4px 0 12px' }}>
+              <Link
+                to="/forgot-password"
+                style={{ fontSize: '13px', color: 'var(--text-muted)' }}
+              >
+                Esqueci minha senha
+              </Link>
+            </div>
+
             <button
               id="btn-login-submit"
               className="btn-primary"

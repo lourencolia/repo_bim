@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import Register    from './pages/Register'
-import Login       from './pages/Login'
-import TwoFactor   from './pages/TwoFactor'
+import Register       from './pages/Register'
+import Login          from './pages/Login'
+import TwoFactor      from './pages/TwoFactor'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword  from './pages/ResetPassword'
 import Home        from './pages/Home'
 import MyFiles     from './pages/MyFiles'
 import SharedFiles from './pages/SharedFiles'
@@ -24,9 +26,11 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           {/* Public */}
-          <Route path="/register" element={<Register />} />
-          <Route path="/login"    element={<Login />} />
-          <Route path="/2fa"      element={<TwoFactor />} />
+          <Route path="/register"        element={<Register />} />
+          <Route path="/login"           element={<Login />} />
+          <Route path="/2fa"             element={<TwoFactor />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password"  element={<ResetPassword />} />
 
           {/* Protected */}
           <Route path="/home"    element={<Protected><Home /></Protected>} />

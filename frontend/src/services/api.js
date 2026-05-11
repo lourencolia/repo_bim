@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -77,5 +77,11 @@ export const getSharedWithMe = () =>
 
 export const getMyActivity = () =>
   api.get('/auth/me/activity')
+
+export const forgotPassword = (email) =>
+  api.post('/auth/forgot-password', { email })
+
+export const resetPassword = (token, new_password) =>
+  api.post('/auth/reset-password', { token, new_password })
 
 export default api

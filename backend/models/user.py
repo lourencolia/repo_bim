@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, String, Text
+from sqlalchemy import Boolean, DateTime, String, Text  # noqa: F401 (Text usado em totp_secret)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,8 +35,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(Text, nullable=False)
     password_salt: Mapped[str] = mapped_column(String(64), nullable=False)
 
-    # Segredo TOTP — nulo até o 2FA ser configurado
-    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True, default=None)
+    # Segredo TOTP cifrado com AES-256-GCM — nulo até o 2FA ser configurado
+    # Formato: 'enc:<base64(nonce+ct)>' — Text para acomodar o valor cifrado
+    totp_secret: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Aceite dos termos de uso (LGPD)
