@@ -28,7 +28,7 @@ async def get_db() -> AsyncSession:
 
 async def init_db() -> None:
     """Cria as tabelas no banco se ainda não existirem."""
-    from backend.models import user, file  # noqa: F401
+    from backend.models import user, file, auth_log, reset_token  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

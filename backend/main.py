@@ -2,8 +2,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from backend.config import settings
 from backend.database.db import init_db
+from backend.limiter import limiter
 from backend.routers import auth, files
 
 
@@ -22,10 +26,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Usamos Bearer token no localStorage, não cookies — allow_origins=["*"] é seguro aqui
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+_cors_origins = (
+    ["*"] if settings.ALLOWED_ORIGINS == "*"
+    else [o.strip() for o in settings.ALLOWED_ORIGINS.split(",")]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

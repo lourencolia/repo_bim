@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
-import aiofiles
 from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import aliased
@@ -11,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.file import File, FileAccessLog, FileShare
 from backend.models.user import User
-
-UPLOAD_BASE = Path(__file__).parent.parent / "uploads"
+from backend.services.crypto_service import decrypt_bytes, encrypt_bytes
+from backend.services.storage_service import download_from_storage, upload_to_storage
 
 ALLOWED_EXTENSIONS = {".rvt", ".ifc", ".nwd", ".nwc", ".pln", ".dwg", ".dxf", ".pdf"}
 
@@ -70,14 +69,10 @@ async def upload_file(
     if len(content) > MAX_FILE_SIZE:
         raise ValueError("Arquivo muito grande. Limite máximo: 200 MB")
 
-    user_dir = UPLOAD_BASE / str(owner.id)
-    user_dir.mkdir(parents=True, exist_ok=True)
-
     stored_name = f"{uuid.uuid4()}{ext}"
-    dest = user_dir / stored_name
 
-    async with aiofiles.open(dest, "wb") as fh:
-        await fh.write(content)
+    encrypted = encrypt_bytes(content)               # AES-256-GCM antes de enviar ao storage
+    await upload_to_storage(str(owner.id), stored_name, encrypted)
 
     record = File(
         owner_id=owner.id,
@@ -112,7 +107,7 @@ async def get_file_for_download(
     file_id: UUID,
     user: User,
     db: AsyncSession,
-) -> tuple[File, Path]:
+) -> tuple[File, bytes]:
     result = await db.execute(
         select(File).where(File.id == file_id, File.is_deleted.is_(False))
     )
@@ -132,14 +127,12 @@ async def get_file_for_download(
         if share_result.scalar_one_or_none() is None:
             raise ValueError("Acesso negado")
 
-    # Arquivo sempre fica na pasta do dono
-    path = UPLOAD_BASE / str(record.owner_id) / record.stored_filename
-    if not path.exists():
-        raise ValueError("Arquivo não encontrado no servidor")
+    raw = await download_from_storage(str(record.owner_id), record.stored_filename)
+    file_bytes = decrypt_bytes(raw)                  # AES-256-GCM — compatível com legados
 
     db.add(_log(file_id, user.id, "download"))
     await db.commit()
-    return record, path
+    return record, file_bytes
 
 
 # ── Exclusão ──────────────────────────────────────────────────────────────────

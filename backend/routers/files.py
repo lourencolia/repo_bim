@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -79,12 +79,11 @@ async def download(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        record, path = await file_service.get_file_for_download(file_id, current_user, db)
+        record, file_bytes = await file_service.get_file_for_download(file_id, current_user, db)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    return FileResponse(
-        path=str(path),
-        filename=record.original_filename,
+    return Response(
+        content=file_bytes,
         media_type=record.mime_type,
         headers={"Content-Disposition": f'attachment; filename="{record.original_filename}"'},
     )

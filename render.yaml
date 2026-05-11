@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: bim-repository-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: ALGORITHM
+        value: HS256
+      - key: TEMP_TOKEN_EXPIRE_MINUTES
+        value: 3
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 60
+      - key: TOTP_ISSUER_NAME
+        value: BIM Repository
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: STORAGE_BUCKET
+        value: bim-files
+      - key: ALLOWED_ORIGINS
+        sync: false

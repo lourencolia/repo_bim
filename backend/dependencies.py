@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.db import get_db
 from backend.models.user import User
-from backend.services.auth_service import decode_access_token
+from backend.services.auth_service import decode_access_token, is_token_revoked
 
 _bearer = HTTPBearer()
 
@@ -15,11 +15,18 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> User:
     try:
-        user_id = decode_access_token(credentials.credentials)
+        user_id, jti = decode_access_token(credentials.credentials)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=str(exc),
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if await is_token_revoked(jti, db):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessão encerrada. Faça login novamente.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

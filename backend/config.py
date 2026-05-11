@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     TOTP_ISSUER_NAME: str = "BIM Repository"
 
+    # Supabase Storage
+    SUPABASE_URL: str
+    SUPABASE_SERVICE_KEY: str
+    STORAGE_BUCKET: str = "bim-files"
+
+    # CORS — use "*" for development, comma-separated URLs for production
+    ALLOWED_ORIGINS: str = "*"
+
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
