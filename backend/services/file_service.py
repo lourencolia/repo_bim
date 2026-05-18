@@ -15,7 +15,7 @@ from backend.services.storage_service import download_from_storage, upload_to_st
 
 ALLOWED_EXTENSIONS = {".rvt", ".ifc", ".nwd", ".nwc", ".pln", ".dwg", ".dxf", ".pdf"}
 
-MAX_FILE_SIZE = 200 * 1024 * 1024  # 200 MB
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB (limite do Supabase Storage gratuito)
 
 _MIME_MAP = {
     ".rvt": "application/octet-stream",

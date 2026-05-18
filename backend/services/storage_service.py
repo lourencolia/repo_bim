@@ -2,6 +2,10 @@ import httpx
 from backend.config import settings
 
 
+class StorageError(ValueError):
+    pass
+
+
 def _url(path: str) -> str:
     return f"{settings.SUPABASE_URL}/storage/v1/object/{settings.STORAGE_BUCKET}/{path}"
 
@@ -13,28 +17,45 @@ def _auth_headers() -> dict:
 async def upload_to_storage(owner_id: str, stored_name: str, data: bytes) -> None:
     path = f"{owner_id}/{stored_name}"
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            _url(path),
-            content=data,
-            headers={
-                **_auth_headers(),
-                "Content-Type": "application/octet-stream",
-                "x-upsert": "true",
-            },
-            timeout=180.0,
-        )
-        response.raise_for_status()
+        try:
+            response = await client.post(
+                _url(path),
+                content=data,
+                headers={
+                    **_auth_headers(),
+                    "Content-Type": "application/octet-stream",
+                    "x-upsert": "true",
+                },
+                timeout=180.0,
+            )
+            response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text[:300]
+            raise StorageError(
+                f"Falha ao enviar arquivo para o storage (HTTP {exc.response.status_code}): {detail}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise StorageError(f"Erro de conexão com o storage: {exc}") from exc
 
 
 async def download_from_storage(owner_id: str, stored_name: str) -> bytes:
     path = f"{owner_id}/{stored_name}"
     async with httpx.AsyncClient() as client:
-        response = await client.get(
-            _url(path),
-            headers=_auth_headers(),
-            timeout=180.0,
-        )
-        if response.status_code == 404:
-            raise ValueError("Arquivo não encontrado no servidor")
-        response.raise_for_status()
-        return response.content
+        try:
+            response = await client.get(
+                _url(path),
+                headers=_auth_headers(),
+                timeout=180.0,
+            )
+            if response.status_code == 404:
+                raise ValueError("Arquivo não encontrado no servidor")
+            response.raise_for_status()
+            return response.content
+        except ValueError:
+            raise
+        except httpx.HTTPStatusError as exc:
+            raise StorageError(
+                f"Falha ao baixar arquivo do storage (HTTP {exc.response.status_code})"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise StorageError(f"Erro de conexão com o storage: {exc}") from exc
