@@ -115,7 +115,7 @@ async def get_file_for_download(
     if record is None:
         raise ValueError("Arquivo não encontrado")
 
-    # Dono tem acesso direto; outros precisam ter compartilhamento ativo
+    # Dono tem acesso direto; outros precisam ter compartilhamento ativo com permissão de download
     if record.owner_id != user.id:
         share_result = await db.execute(
             select(FileShare).where(
@@ -124,8 +124,11 @@ async def get_file_for_download(
                 FileShare.revoked_at.is_(None),
             )
         )
-        if share_result.scalar_one_or_none() is None:
+        share = share_result.scalar_one_or_none()
+        if share is None:
             raise ValueError("Acesso negado")
+        if share.permission != "download":
+            raise ValueError("Este arquivo foi compartilhado apenas para visualização")
 
     raw = await download_from_storage(str(record.owner_id), record.stored_filename)
     file_bytes = decrypt_bytes(raw)                  # AES-256-GCM — compatível com legados
@@ -178,7 +181,7 @@ async def share_file(
         file_id=file_id,
         shared_by=owner.id,
         shared_with=recipient.id,
-        permission="download",
+        permission="view",
         lgpd_consent_at=now,
     )
     db.add(share)

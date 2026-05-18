@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import DashLayout from '../components/DashLayout'
 import { getSharedWithMe } from '../services/api'
-import { Building, Ruler, FileText, File, Users, Download, AlertTriangle } from 'lucide-react'
+import { Building, Ruler, FileText, File, Users, Eye, AlertTriangle } from 'lucide-react'
 
 function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -35,23 +35,6 @@ export default function SharedFiles() {
       .catch(() => setError('Erro ao carregar arquivos compartilhados.'))
       .finally(() => setLoading(false))
   }, [])
-
-  function handleDownload(file) {
-    const token = localStorage.getItem('access_token')
-    fetch(`http://localhost:8000/files/${file.id}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = file.original_filename
-        a.click()
-        URL.revokeObjectURL(url)
-      })
-      .catch(() => setError('Erro ao baixar arquivo.'))
-  }
 
   return (
     <DashLayout>
@@ -103,13 +86,9 @@ export default function SharedFiles() {
                   <td className="file-td-size">{formatSize(f.file_size)}</td>
                   <td className="file-td-date">{formatDate(f.shared_at)}</td>
                   <td>
-                    <button
-                      className="btn-icon"
-                      title="Baixar"
-                      onClick={() => handleDownload(f)}
-                    >
-                      <Download size={18} />
-                    </button>
+                    <span className="badge-view-only" title="Somente visualização">
+                      <Eye size={14} /> Somente visualização
+                    </span>
                   </td>
                 </tr>
               ))}

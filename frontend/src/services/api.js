@@ -72,6 +72,9 @@ export const getFileShares = (fileId) =>
 export const revokeShare = (fileId, shareId) =>
   api.delete(`/files/${fileId}/share/${shareId}`)
 
+export const downloadFile = (fileId) =>
+  api.get(`/files/${fileId}/download`, { responseType: 'blob' })
+
 export const getSharedWithMe = () =>
   api.get('/files/shared-with-me')
 
