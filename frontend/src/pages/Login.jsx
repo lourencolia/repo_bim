@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { login } from '../services/api'
-import { Landmark, Lock, Folder, Key, AlertTriangle, Timer } from 'lucide-react'
+import { Landmark, Lock, Folder, Key, AlertTriangle, Timer, ShieldAlert } from 'lucide-react'
 
 export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const location = useLocation()
   const sessionExpired  = searchParams.get('expired') === '1'
+  const authRequired = location.state?.reason === 'auth_required'
   const [form, setForm]     = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError]   = useState('')
@@ -87,6 +89,11 @@ export default function Login() {
           {sessionExpired && (
             <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Timer size={16} /> Sessão expirada. Faça login novamente.
+            </div>
+          )}
+          {authRequired && !sessionExpired && (
+            <div className="alert alert-warning" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldAlert size={16} /> Você precisa estar logado para acessar essa página.
             </div>
           )}
           {error && (
