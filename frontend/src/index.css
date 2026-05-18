@@ -576,6 +576,7 @@ a:hover { color: var(--accent); text-shadow: 0 0 10px rgba(0,123,255,0.5); }
 .file-cell-name { font-weight: 500; }
 .file-cell-desc { font-size: 0.8rem; color: var(--text-secondary); }
 .actions-row { display: flex; gap: 8px; }
+.badge-view-only { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 100px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-side); color: var(--text-secondary); white-space: nowrap; }
 
 /* Upload / Drag-drop */
 .upload-wrap { max-width: 600px; }

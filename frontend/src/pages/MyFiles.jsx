@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import DashLayout from '../components/DashLayout'
 import ShareModal from '../components/ShareModal'
-import { getMyFiles, deleteFile } from '../services/api'
+import { getMyFiles, deleteFile, downloadFile } from '../services/api'
 import { Building, Ruler, FileText, File, FolderOpen, Download, Share2, Trash2, AlertTriangle } from 'lucide-react'
 
 function formatSize(bytes) {
@@ -57,21 +57,18 @@ export default function MyFiles() {
     }
   }
 
-  function handleDownload(file) {
-    const token = localStorage.getItem('access_token')
-    fetch(`http://localhost:8000/files/${file.id}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(r => r.blob())
-      .then(blob => {
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = file.original_filename
-        a.click()
-        URL.revokeObjectURL(url)
-      })
-      .catch(() => setError('Erro ao baixar arquivo.'))
+  async function handleDownload(file) {
+    try {
+      const response = await downloadFile(file.id)
+      const url = URL.createObjectURL(response.data)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = file.original_filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Erro ao baixar arquivo.')
+    }
   }
 
   return (
