@@ -577,6 +577,8 @@ a:hover { color: var(--accent); text-shadow: 0 0 10px rgba(0,123,255,0.5); }
 .file-cell-desc { font-size: 0.8rem; color: var(--text-secondary); }
 .actions-row { display: flex; gap: 8px; }
 .badge-view-only { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 500; padding: 4px 10px; border-radius: 100px; background: rgba(255,255,255,0.05); border: 1px solid var(--border-side); color: var(--text-secondary); white-space: nowrap; }
+.confirm-row { display: flex; align-items: center; gap: 8px; }
+.confirm-text { font-size: 0.85rem; color: var(--text-secondary); }
 
 /* Upload / Drag-drop */
 .upload-wrap { max-width: 600px; }
@@ -666,3 +668,126 @@ a:hover { color: var(--accent); text-shadow: 0 0 10px rgba(0,123,255,0.5); }
 .auth-footer { margin-top: 2rem; text-align: center; font-size: 0.9rem; color: var(--text-secondary); }
 .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 480px) { .form-row-2 { grid-template-columns: 1fr; } }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Responsive — Tablet & Mobile
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Tablet / phablet (≤ 768px) ── */
+@media (max-width: 768px) {
+
+  /* Show hamburger */
+  .dash-hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Sidebar becomes a slide-in drawer over the content */
+  .dash-sidebar {
+    position: fixed;
+    left: -280px;
+    top: 72px;                         /* nav height */
+    height: calc(100vh - 72px);
+    width: 260px;
+    z-index: 100;
+    transition: left 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+  }
+  .dash-sidebar.open {
+    left: 0;
+    box-shadow: 6px 0 32px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Semi-transparent backdrop that closes the drawer on tap */
+  .dash-overlay {
+    position: fixed;
+    inset: 0;
+    top: 72px;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 90;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+
+  /* Nav — hide user info to save space, keep logout */
+  .dash-nav { padding: 0 1rem; }
+  .dash-user-info { display: none; }
+
+  /* Dashboard body — content takes full width (sidebar is overlaid) */
+  .dash-body { overflow: visible; }
+  .dash-content { padding: 1.5rem 1rem; }
+
+  /* Page header */
+  .page-header { flex-wrap: wrap; gap: 0.75rem; }
+  .page-title { font-size: 1.5rem; }
+
+  /* Stats cards — allow smaller cards so 3 still fit side-by-side on tablet */
+  .stats-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+  .stat-value { font-size: 1.5rem; }
+  .stat-card { padding: 1.25rem 1rem; }
+
+  /* Section headers */
+  .section-title { font-size: 1.1rem; }
+
+  /* File list rows — truncate long filenames */
+  .file-row-info { min-width: 0; flex: 1; }
+  .file-row-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Upload form */
+  .upload-wrap { max-width: 100%; }
+  .drop-zone { padding: 2.5rem 1.25rem; }
+
+  /* Auth */
+  .auth-card { padding: 2rem 1.5rem; }
+
+  /* Home public page */
+  .home-title { font-size: 2.75rem; }
+  .home-main { padding: 3rem 1.5rem; }
+  .home-nav { padding: 0.75rem 1.5rem; }
+  .home-nav-logo { font-size: 1.2rem; }
+
+  /* Modals — full-width on small screens */
+  .modal-box { max-width: 100%; margin: 0 1rem; }
+
+  /* Not Found */
+  .notfound-content { padding: 3rem 2rem; }
+  .notfound-code { font-size: 5rem; }
+}
+
+/* ── Small phones (≤ 480px) ── */
+@media (max-width: 480px) {
+
+  .dash-content { padding: 1.25rem 0.875rem; }
+  .page-title { font-size: 1.25rem; }
+
+  /* Stats — stack in 2 columns */
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+
+  /* File list — hide date column to save space */
+  .file-row-date { display: none; }
+  .file-row-simple { gap: 0.75rem; }
+
+  /* OTP inputs — narrower so all 6 fit on a 375px screen */
+  .otp-input-wrap { gap: 7px; margin: 1.25rem 0; }
+  .otp-digit { width: 42px; height: 52px; font-size: 1.25rem; }
+
+  /* Home */
+  .home-title { font-size: 2rem; }
+  .home-subtitle { font-size: 1rem; }
+  .home-badge { font-size: 0.7rem; }
+
+  /* Auth card */
+  .auth-card { padding: 1.5rem 1rem; }
+  .auth-card-title { font-size: 1.5rem; }
+  .brand-title { font-size: 2.5rem; }
+
+  /* Table actions — stack confirm row */
+  .confirm-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .confirm-text { font-size: 0.8rem; width: 100%; }
+
+  /* Modals */
+  .modal-box { margin: 0; border-radius: var(--radius-md) var(--radius-md) 0 0; position: fixed; bottom: 0; left: 0; right: 0; }
+  .modal-overlay { align-items: flex-end; padding: 0; }
+  .modal-body { max-height: 55vh; }
+}
