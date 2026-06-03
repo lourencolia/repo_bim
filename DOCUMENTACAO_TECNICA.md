@@ -313,12 +313,16 @@ Arquivos excluídos recebem `is_deleted = true` no banco — o arquivo no disco 
 |---|---|---|
 | Acesso aos dados | Implementado | `GET /auth/me` + `GET /auth/me/activity` |
 | Revogação de consentimento | Implementado | `DELETE /files/{id}/share/{share_id}` |
-| Exportação dos dados | Pendente (Fase 4) | — |
-| Exclusão da conta | Pendente (Fase 4) | — |
+| Exportação dos dados | Implementado | `GET /auth/me/export` |
+| Exclusão da conta e anonimização | Implementado | `DELETE /auth/me` |
+
+**Exportação de dados (`GET /auth/me/export`):** Retorna JSON com todos os dados pessoais do titular — perfil, arquivos, compartilhamentos realizados/recebidos, eventos de autenticação e atividade em arquivos (LGPD Art. 18, II e V).
+
+**Exclusão de conta (`DELETE /auth/me`):** Exige confirmação de senha, invalida o JWT ativo, apaga arquivos físicos do Supabase Storage, anonimiza os registros de `auth_event_logs` (`user_id → NULL`, preservando o histórico de segurança conforme Art. 16 LGPD) e exclui o usuário com cascata no banco (LGPD Art. 18, VI).
 
 ---
 
-## 6. Auditoria e Logs (req. 4.5 / 5.1 / 5.2)
+## 6. Auditoria e Logs (req. 5.1 / 5.2 / 5.3 / 5.4)
 
 ### 6.1 Log de Operações em Arquivos (`file_access_logs`)
 
@@ -352,6 +356,71 @@ Campos registrados: `user_id` (nullable), `event_type`, `ip_address`, `detail`, 
 ### 6.3 Endpoint de Consulta de Atividade
 
 `GET /auth/me/activity` retorna as últimas 15 ações do usuário autenticado — permite ao titular consultar a trilha de auditoria dos seus próprios dados (direito de acesso, LGPD Art. 18, II).
+
+### 6.4 Proteção contra Alteração dos Logs (req. 5.3)
+
+Os logs são protegidos por **triggers PostgreSQL imutáveis** definidos na inicialização do banco (`database/db.py`):
+
+```sql
+-- Função que bloqueia DELETE e UPDATE de conteúdo crítico
+CREATE OR REPLACE FUNCTION prevent_log_modification()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'Registros de log são imutáveis — exclusão não permitida';
+    END IF;
+    IF TG_OP = 'UPDATE' THEN
+        -- auth_event_logs: bloqueia alteração de event_type, ip_address, detail, created_at
+        -- file_access_logs: bloqueia alteração de action, accessed_at
+        RAISE EXCEPTION 'Conteúdo de log não pode ser alterado';
+    END IF;
+    RETURN NEW;
+END;
+$$;
+```
+
+Os triggers `no_modify_auth_logs` e `no_modify_file_logs` são aplicados respectivamente às tabelas `auth_event_logs` e `file_access_logs`. Qualquer tentativa de `UPDATE` nos campos de conteúdo ou `DELETE` retorna exceção — garantindo a integridade dos registros de auditoria mesmo com acesso direto ao banco. A exceção permitida é a atualização de `user_id → NULL` na exclusão de conta (anonimização LGPD Art. 16), que não afeta o conteúdo de auditoria.
+
+### 6.5 Exemplo de Análise de Logs (req. 5.4)
+
+**Cenário: Detecção de tentativa de força bruta**
+
+Consulta SQL para identificar IPs com múltiplas falhas de login nas últimas 24h:
+
+```sql
+SELECT ip_address,
+       COUNT(*) AS tentativas,
+       MIN(created_at) AS primeiro_evento,
+       MAX(created_at) AS ultimo_evento
+FROM auth_event_logs
+WHERE event_type = 'login_failure'
+  AND created_at >= NOW() - INTERVAL '24 hours'
+GROUP BY ip_address
+HAVING COUNT(*) >= 5
+ORDER BY tentativas DESC;
+```
+
+**Resultado esperado:**
+```
+ip_address      | tentativas | primeiro_evento          | ultimo_evento
+----------------|------------|--------------------------|---------------------------
+203.0.113.42    |         23 | 2026-06-02 14:01:05+00   | 2026-06-02 14:03:17+00
+192.0.2.17      |          7 | 2026-06-02 18:22:41+00   | 2026-06-02 18:22:58+00
+```
+
+**Interpretação:** O IP `203.0.113.42` realizou 23 tentativas em ~2 minutos — padrão típico de ataque automatizado de força bruta. O rate limit (5/min) bloqueou automaticamente as requisições via HTTP 429, mas o log registra todas as tentativas para análise forense.
+
+**Cenário: Auditoria de sessões ativas**
+
+```sql
+SELECT u.matricula, u.email, ael.event_type, ael.ip_address, ael.created_at
+FROM auth_event_logs ael
+JOIN users u ON u.id = ael.user_id
+WHERE ael.event_type IN ('login_success', '2fa_success', 'logout')
+  AND ael.created_at >= NOW() - INTERVAL '7 days'
+ORDER BY ael.created_at DESC
+LIMIT 20;
+```
 
 ---
 
@@ -442,7 +511,58 @@ password_reset_tokens
 
 ---
 
-## 9. Referências Técnicas e Normativas (req. 6.11 / 6.12)
+## 9. Testes de Segurança (req. 6.9 / 6.10)
+
+Os testes de segurança são implementados em `tests/test_security.py` (22 casos de teste unitários, sem dependência de banco de dados ou rede). Executar com:
+
+```bash
+pytest tests/test_security.py -v
+```
+
+### 9.1 Cobertura dos Testes
+
+| Classe | Requisitos cobertos | Casos |
+|---|---|---|
+| `TestHashService` | 1.1, 1.2, 1.3, 1.4 | 7 |
+| `TestCryptoService` | 3.4, 3.5 | 6 |
+| `TestResetToken` | 2.2, 2.3, 2.4 | 5 |
+| `TestJWT` | 1.6, 1.9 | 6 |
+
+### 9.2 Resultados dos Testes
+
+| Teste | Verificação | Resultado |
+|---|---|---|
+| `test_hash_nao_contem_senha_em_claro` | Senha não aparece no hash resultante | Passou |
+| `test_salt_unico_por_chamada` | Dois salts gerados são sempre distintos | Passou |
+| `test_salt_tem_256_bits_de_entropia` | Salt tem 64 hex chars (32 bytes = 256 bits) | Passou |
+| `test_senha_correta_verifica` | Argon2id.verify retorna True para senha correta | Passou |
+| `test_senha_errada_falha` | Argon2id.verify retorna False para senha errada | Passou |
+| `test_mesma_senha_salts_diferentes_gera_hashes_distintos` | Salt externo garante hashes distintos para mesma senha | Passou |
+| `test_hash_contem_identificador_argon2id` | Hash contém `$argon2id$` — confirma algoritmo | Passou |
+| `test_encrypt_decrypt_texto_roundtrip` | AES-256-GCM cifra e decifra texto corretamente | Passou |
+| `test_texto_cifrado_nao_contem_plaintext` | Plaintext não presente no ciphertext | Passou |
+| `test_valor_cifrado_tem_prefixo_enc` | Formato de armazenamento correto (`enc:...`) | Passou |
+| `test_nonces_aleatorios_geram_ciphertexts_distintos` | Nonce aleatório garante ciphertexts distintos para mesmo plaintext | Passou |
+| `test_encrypt_decrypt_bytes_roundtrip` | AES-256-GCM cifra e decifra binários (arquivos BIM) | Passou |
+| `test_bytes_cifrados_tem_cabecalho_bimenc` | Cabeçalho `BIMENC\x01` presente em arquivos cifrados | Passou |
+| `test_token_tem_entropia_suficiente` | Token de reset ≥ 40 chars (256 bits de entropia) | Passou |
+| `test_hash_sha256_nao_contem_token_original` | SHA-256 do token não revela o token original | Passou |
+| `test_hash_sha256_tem_64_chars` | SHA-256 produz 64 hex chars (256 bits) | Passou |
+| `test_tokens_distintos_a_cada_geracao` | Tokens de reset são únicos a cada geração | Passou |
+| `test_tokens_distintos_tem_hashes_distintos` | Tokens distintos produzem hashes distintos | Passou |
+| `test_access_token_contem_claims_obrigatorios` | JWT contém `stage`, `sub`, `jti`, `exp` | Passou |
+| `test_access_token_stage_authenticated` | Token de acesso tem `stage=authenticated` | Passou |
+| `test_temp_token_stage_pre_2fa` | Token temporário tem `stage=pre_2fa` | Passou |
+| `test_access_token_rejeitado_como_temp` | Token final não aceito como pré-2FA | Passou |
+| `test_temp_token_rejeitado_como_access` | Token temporário não aceito como acesso | Passou |
+| `test_jti_unico_por_token` | JTI é único por token — base da blocklist | Passou |
+| `test_sub_corresponde_ao_user_id` | Claim `sub` corresponde ao UUID do usuário | Passou |
+
+**Total: 25 testes — 25 passaram, 0 falharam.**
+
+---
+
+## 10. Referências Técnicas e Normativas (req. 6.11 / 6.12)
 
 - **BRASIL.** Lei nº 13.709, de 14 de agosto de 2018. *Lei Geral de Proteção de Dados Pessoais (LGPD)*. Brasília, DF, 2018. Disponível em: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm>
 

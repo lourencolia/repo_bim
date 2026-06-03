@@ -38,6 +38,33 @@ async def upload_to_storage(owner_id: str, stored_name: str, data: bytes) -> Non
             raise StorageError(f"Erro de conexão com o storage: {exc}") from exc
 
 
+async def delete_folder_from_storage(owner_id: str) -> None:
+    """Remove todos os arquivos de um usuário via deleção em lote por prefixo.
+
+    Usa DELETE /object/{bucket} com body {"prefixes": ["uuid/"]} — uma única
+    chamada HTTP apaga toda a pasta. Retorna sem erro se a pasta não existir
+    (usuário sem arquivos é um estado válido).
+    """
+    url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.STORAGE_BUCKET}"
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.delete(
+                url,
+                headers={**_auth_headers(), "Content-Type": "application/json"},
+                json={"prefixes": [f"{owner_id}/"]},
+                timeout=60.0,
+            )
+            if response.status_code not in (200, 404):
+                response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text[:300]
+            raise StorageError(
+                f"Falha ao excluir arquivos do storage (HTTP {exc.response.status_code}): {detail}"
+            ) from exc
+        except httpx.RequestError as exc:
+            raise StorageError(f"Erro de conexão com o storage: {exc}") from exc
+
+
 async def download_from_storage(owner_id: str, stored_name: str) -> bytes:
     path = f"{owner_id}/{stored_name}"
     async with httpx.AsyncClient() as client:
