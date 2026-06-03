@@ -4,11 +4,13 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from jose import JWTError, jwt
-from sqlalchemy import select
+from sqlalchemy import select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from backend.config import settings
 from backend.models.auth_log import AuthEventLog, TokenBlocklist
+from backend.models.file import File, FileAccessLog, FileShare
 from backend.models.reset_token import PasswordResetToken
 from backend.models.user import User
 from backend.services.crypto_service import decrypt_text, encrypt_text
@@ -165,6 +167,7 @@ async def register_user(
     email: str,
     password: str,
     db: AsyncSession,
+    terms_version: str = "1.0",
 ) -> User:
     """Cadastra um novo usuário com hash Argon2id e salt único."""
     existing_matricula = await db.execute(select(User).where(User.matricula == matricula))
@@ -186,6 +189,7 @@ async def register_user(
         password_salt=salt,
         terms_accepted=True,
         terms_accepted_at=now,
+        terms_version=terms_version,
     )
     db.add(user)
     await db.commit()
@@ -321,6 +325,179 @@ async def request_password_reset(
     ))
     await db.commit()
     return token
+
+
+# ── Exportação de dados do titular (req. LGPD 4.9) ───────────────────────────
+
+async def export_user_data(user_id: UUID, db: AsyncSession) -> dict:
+    """Agrega todos os dados pessoais do titular em JSON — req. 4.9 LGPD Art. 18."""
+    result = await db.execute(select(User).where(User.id == user_id))
+    user: User | None = result.scalar_one_or_none()
+    if user is None:
+        raise ValueError("Usuário não encontrado")
+
+    files_result = await db.execute(
+        select(File).where(File.owner_id == user_id).order_by(File.uploaded_at.desc())
+    )
+    files = files_result.scalars().all()
+
+    Recipient = aliased(User)
+    shares_made_result = await db.execute(
+        select(FileShare, Recipient)
+        .join(Recipient, FileShare.shared_with == Recipient.id)
+        .where(FileShare.shared_by == user_id)
+        .order_by(FileShare.shared_at.desc())
+    )
+
+    Sharer = aliased(User)
+    shares_received_result = await db.execute(
+        select(FileShare, Sharer)
+        .join(Sharer, FileShare.shared_by == Sharer.id)
+        .where(FileShare.shared_with == user_id)
+        .order_by(FileShare.shared_at.desc())
+    )
+
+    auth_events_result = await db.execute(
+        select(AuthEventLog)
+        .where(AuthEventLog.user_id == user_id)
+        .order_by(AuthEventLog.created_at.desc())
+        .limit(500)
+    )
+
+    file_activity_result = await db.execute(
+        select(FileAccessLog)
+        .where(FileAccessLog.accessed_by == user_id)
+        .order_by(FileAccessLog.accessed_at.desc())
+        .limit(500)
+    )
+
+    return {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "profile": {
+            "user_id":          str(user.id),
+            "matricula":        user.matricula,
+            "full_name":        user.full_name,
+            "course":           user.course,
+            "email":            user.email,
+            "terms_version":    user.terms_version,
+            "terms_accepted_at": user.terms_accepted_at.isoformat() if user.terms_accepted_at else None,
+            "created_at":       user.created_at.isoformat(),
+        },
+        "files": [
+            {
+                "id":                str(f.id),
+                "original_filename": f.original_filename,
+                "file_size_bytes":   f.file_size,
+                "mime_type":         f.mime_type,
+                "description":       f.description,
+                "uploaded_at":       f.uploaded_at.isoformat(),
+                "is_deleted":        f.is_deleted,
+            }
+            for f in files
+        ],
+        "shares_made": [
+            {
+                "file_id":               str(share.file_id),
+                "shared_with_matricula": recipient.matricula,
+                "shared_at":             share.shared_at.isoformat(),
+                "revoked_at":            share.revoked_at.isoformat() if share.revoked_at else None,
+                "lgpd_consent_at":       share.lgpd_consent_at.isoformat(),
+            }
+            for share, recipient in shares_made_result.all()
+        ],
+        "shares_received": [
+            {
+                "file_id":              str(share.file_id),
+                "shared_by_matricula":  sharer.matricula,
+                "shared_at":            share.shared_at.isoformat(),
+                "revoked_at":           share.revoked_at.isoformat() if share.revoked_at else None,
+            }
+            for share, sharer in shares_received_result.all()
+        ],
+        "auth_events": [
+            {
+                "event_type": ev.event_type,
+                "ip_address": ev.ip_address,
+                "created_at": ev.created_at.isoformat(),
+            }
+            for ev in auth_events_result.scalars().all()
+        ],
+        "file_activity": [
+            {
+                "action":      log.action,
+                "file_id":     str(log.file_id) if log.file_id else None,
+                "accessed_at": log.accessed_at.isoformat(),
+            }
+            for log in file_activity_result.scalars().all()
+        ],
+    }
+
+
+# ── Exclusão de conta e dados pessoais (req. LGPD 4.10) ──────────────────────
+
+async def delete_user_account(
+    user_id: UUID,
+    password: str,
+    token: str,
+    db: AsyncSession,
+) -> None:
+    """Exclui conta e anonimiza dados pessoais — req. 4.10 LGPD Art. 18, VI.
+
+    Ordem de operações:
+    1. Verifica senha (confirmação explícita antes de qualquer ação destrutiva)
+    2. Invalida o token atual (impede uso do JWT após a exclusão)
+    3. Apaga arquivos físicos do Supabase Storage
+    4. Registra evento de exclusão nos logs de auditoria
+    5. Anonimiza auth_event_logs (user_id → NULL — Art. 16 LGPD)
+    6. Exclui o usuário — CASCADE cuida de files, file_shares, password_reset_tokens;
+       FK SET NULL cuida de file_access_logs.accessed_by
+    """
+    from backend.services.storage_service import StorageError, delete_folder_from_storage
+
+    # 1. Verificação de senha
+    result = await db.execute(select(User).where(User.id == user_id))
+    user: User | None = result.scalar_one_or_none()
+    if user is None:
+        raise ValueError("Usuário não encontrado")
+    if not verify_password(password, user.password_salt, user.password_hash):
+        raise ValueError("Senha incorreta")
+
+    # 2. Invalida o token atual
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        jti: str = payload.get("jti", "")
+        exp = payload.get("exp")
+        if jti:
+            expires_at = (
+                datetime.fromtimestamp(exp, tz=timezone.utc)
+                if exp
+                else datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+            )
+            if not await is_token_revoked(jti, db):
+                await revoke_token(jti=jti, expires_at=expires_at, db=db)
+    except JWTError:
+        pass  # token já expirado ou inválido — segue com a exclusão
+
+    # 3. Apaga arquivos físicos do Supabase Storage (pasta inteira do usuário)
+    try:
+        await delete_folder_from_storage(str(user_id))
+    except StorageError:
+        pass  # pasta vazia ou inacessível — não bloqueia a exclusão da conta
+
+    # 4. Registra evento de exclusão antes de anonimizar
+    await log_auth_event(user_id, "account_deleted", None, None, db)
+
+    # 5. Anonimiza auth_event_logs: user_id → NULL (LGPD Art. 16)
+    # O trigger permite UPDATE de user_id; bloqueia apenas alterações de conteúdo de auditoria
+    await db.execute(
+        sa_update(AuthEventLog)
+        .where(AuthEventLog.user_id == user_id)
+        .values(user_id=None)
+    )
+
+    # 6. Exclui o usuário — cascades DB cuidam do restante
+    await db.delete(user)
+    await db.commit()
 
 
 async def reset_password(
