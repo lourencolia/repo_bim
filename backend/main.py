@@ -38,6 +38,27 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
         content={"detail": "Erro interno do servidor. Tente novamente mais tarde."},
     )
 
+
+# req. 3.1/3.2 — HTTPS enforcement para produção no Render
+# O Render termina TLS no proxy; o backend recebe HTTP internamente.
+# X-Forwarded-Proto: https indica que a requisição externa era segura.
+# Quando FORCE_HTTPS=true: rejeita conexões sem o header (acesso direto não-HTTPS)
+# e adiciona Strict-Transport-Security em todas as respostas.
+@app.middleware("http")
+async def enforce_https(request: Request, call_next):
+    if settings.FORCE_HTTPS:
+        proto = request.headers.get("x-forwarded-proto", "https")
+        if proto == "http":
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Conexão não segura. Acesse via HTTPS."},
+            )
+    response = await call_next(request)
+    if settings.FORCE_HTTPS:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
+
+
 _cors_origins = (
     ["*"] if settings.ALLOWED_ORIGINS == "*"
     else [o.strip() for o in settings.ALLOWED_ORIGINS.split(",")]

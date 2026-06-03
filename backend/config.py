@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # CORS — use "*" for development, comma-separated URLs for production
     ALLOWED_ORIGINS: str = "*"
 
+    # req. 3.1/3.2 — ativar em produção (Render): FORCE_HTTPS=true
+    # Verifica X-Forwarded-Proto (Render termina TLS no proxy) e adiciona HSTS
+    FORCE_HTTPS: bool = False
+
     model_config = SettingsConfigDict(
         env_file=_ENV_FILE,
         env_file_encoding="utf-8",
