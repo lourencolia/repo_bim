@@ -562,7 +562,20 @@ pytest tests/test_security.py -v
 
 ---
 
-## 10. Referências Técnicas e Normativas (req. 6.11 / 6.12)
+## 10. Ferramentas de Apoio ao Desenvolvimento
+
+### Claude (Anthropic — Claude Code)
+
+O assistente de IA **Claude** (via Claude Code CLI) foi utilizado como apoio técnico durante o desenvolvimento deste projeto, com foco na resolução de problemas nas seguintes áreas:
+
+- **Deploy em produção** — diagnóstico de erros de configuração de ambiente, variáveis de ambiente ausentes, incompatibilidades de dependências e ajustes no processo de build para as plataformas de hospedagem utilizadas.
+- **Integração com Supabase** — resolução de problemas relacionados ao armazenamento de arquivos (Supabase Storage), configuração de políticas de acesso (Row Level Security — RLS), correção de URLs de upload/download e tratamento de erros retornados pela API do Supabase.
+
+O uso do Claude foi voltado exclusivamente a fins de suporte técnico e resolução de problemas pontuais, mantendo a autoria e responsabilidade do código com a equipe de desenvolvimento.
+
+---
+
+## 11. Referências Técnicas e Normativas (req. 6.11 / 6.12)
 
 - **BRASIL.** Lei nº 13.709, de 14 de agosto de 2018. *Lei Geral de Proteção de Dados Pessoais (LGPD)*. Brasília, DF, 2018. Disponível em: <https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm>
 
