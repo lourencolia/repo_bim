@@ -27,6 +27,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=12, max_length=128)
     terms_accepted: bool
+    # req. 4.7 — versão dos termos aceitos; default mantém compatibilidade com clientes existentes
+    terms_version: str = Field(default="1.0", max_length=10)
 
 
 class RegisterResponse(BaseModel):
@@ -54,6 +56,12 @@ class MeResponse(BaseModel):
     course: str
     email: str
     created_at: datetime
+    terms_version: str
+    terms_accepted_at: datetime | None
+
+
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class Setup2FARequest(BaseModel):
@@ -98,6 +106,7 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)) ->
             email=body.email,
             password=body.password,
             db=db,
+            terms_version=body.terms_version,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -240,7 +249,37 @@ async def me(current_user: User = Depends(get_current_user)) -> MeResponse:
         course=current_user.course,
         email=current_user.email,
         created_at=current_user.created_at,
+        terms_version=current_user.terms_version,
+        terms_accepted_at=current_user.terms_accepted_at,
     )
+
+
+@router.get("/me/export")
+async def export_my_data(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Exporta todos os dados pessoais do titular em JSON — req. LGPD 4.9 Art. 18."""
+    return await auth_service.export_user_data(user_id=current_user.id, db=db)
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    body: DeleteAccountRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """Exclui a conta e todos os dados pessoais do titular — req. LGPD 4.10 Art. 18, VI."""
+    try:
+        await auth_service.delete_user_account(
+            user_id=current_user.id,
+            password=body.password,
+            token=credentials.credentials,
+            db=db,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
 
 @router.get("/me/activity")
