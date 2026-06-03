@@ -1,9 +1,12 @@
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
 from jose import JWTError, jwt
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
@@ -476,13 +479,13 @@ async def delete_user_account(
             if not await is_token_revoked(jti, db):
                 await revoke_token(jti=jti, expires_at=expires_at, db=db)
     except JWTError:
-        pass  # token já expirado ou inválido — segue com a exclusão
+        logger.warning("Token already expired during account deletion for user %s — skipping revocation", user_id)
 
     # 3. Apaga arquivos físicos do Supabase Storage (pasta inteira do usuário)
     try:
         await delete_folder_from_storage(str(user_id))
     except StorageError:
-        pass  # pasta vazia ou inacessível — não bloqueia a exclusão da conta
+        logger.warning("Storage deletion failed for user %s — proceeding with account removal", user_id)
 
     # 4. Registra evento de exclusão antes de anonimizar
     await log_auth_event(user_id, "account_deleted", None, None, db)
