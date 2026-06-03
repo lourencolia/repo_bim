@@ -22,9 +22,6 @@ backend/uploads/
 frontend/dist/
 frontend/node_modules/
 
-# PDFs
-*.pdf
-
 # macOS
 .DS_Store
 
