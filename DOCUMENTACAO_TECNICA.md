@@ -1,5 +1,9 @@
-# Documentação Técnica — Repositório Seguro de Arquivos BIM
+# Documentação Técnica — Repositório Seguro de Arquivos BIM - RASA 
 
+**Autores:** Liandra Lourenço de Oliveira RGM - 11232200971, Nader El Khechen - 11241403833
+**Instituição:** UMC - Universidade de Mogi Das Cruzes
+**Orientador:** Prof. Dr. Fabiano Menegidio  
+**Ano:** 2026
 **Projeto Integrador — Políticas de Segurança da Informação**
 **Tema:** Desenvolvimento de um Sistema Seguro de Autenticação, Comunicação e Gestão de Credenciais em Conformidade com a LGPD
 
