@@ -50,15 +50,18 @@ def create_temp_token(user_id: UUID) -> str:
 
 
 def create_access_token(user_id: UUID) -> str:
-    """JWT final emitido após a validação do 2FA."""
     return _create_jwt(
         {"sub": str(user_id), "stage": "authenticated"},
         timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
 
 
-def decode_access_token(token: str) -> tuple[UUID, str]:
-    """Decodifica e valida o JWT final de acesso. Retorna (user_id, jti)."""
+def _decode_access_payload(token: str) -> tuple[UUID, str, datetime]:
+    """Shared JWT validation for all authenticated-stage token consumers.
+
+    Returns (user_id, jti, expires_at). Centralises decode/validate so
+    logout, delete-account, and get_current_user all enforce the same rules.
+    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError as exc:
@@ -68,9 +71,27 @@ def decode_access_token(token: str) -> tuple[UUID, str]:
         raise ValueError("Token de acesso inválido")
 
     try:
-        return UUID(payload["sub"]), payload["jti"]
+        user_id = UUID(payload["sub"])
     except (KeyError, ValueError) as exc:
         raise ValueError("Token com subject inválido") from exc
+
+    jti: str = payload.get("jti", "")
+    if not jti:
+        raise ValueError("Token sem JTI — não pode ser invalidado")
+
+    exp = payload.get("exp")
+    expires_at = (
+        datetime.fromtimestamp(exp, tz=timezone.utc)
+        if exp
+        else datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    return user_id, jti, expires_at
+
+
+def decode_access_token(token: str) -> tuple[UUID, str]:
+    user_id, jti, _ = _decode_access_payload(token)
+    return user_id, jti
 
 
 def decode_temp_token(token: str) -> UUID:
@@ -92,13 +113,11 @@ def decode_temp_token(token: str) -> UUID:
 # ── Blocklist de tokens ───────────────────────────────────────────────────────
 
 async def revoke_token(jti: str, expires_at: datetime, db: AsyncSession) -> None:
-    """Adiciona o JTI à blocklist, impedindo reutilização até a expiração natural."""
     db.add(TokenBlocklist(jti=jti, expires_at=expires_at))
     await db.commit()
 
 
 async def is_token_revoked(jti: str, db: AsyncSession) -> bool:
-    """Retorna True se o JTI constar na blocklist (token invalidado por logout)."""
     result = await db.execute(select(TokenBlocklist).where(TokenBlocklist.jti == jti))
     return result.scalar_one_or_none() is not None
 
@@ -124,41 +143,12 @@ async def log_auth_event(
 # ── Logout ────────────────────────────────────────────────────────────────────
 
 async def logout_user(token: str, db: AsyncSession, ip_address: str | None = None) -> None:
-    """Invalida o token atual inserindo seu JTI na blocklist."""
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    except JWTError as exc:
-        raise ValueError("Token inválido ou expirado") from exc
-
-    if payload.get("stage") != "authenticated":
-        raise ValueError("Token de acesso inválido")
-
-    jti: str = payload.get("jti", "")
-    if not jti:
-        raise ValueError("Token sem JTI — não pode ser invalidado")
-
-    try:
-        user_id = UUID(payload["sub"])
-    except (KeyError, ValueError) as exc:
-        raise ValueError("Token com subject inválido") from exc
-
-    exp = payload.get("exp")
-    expires_at = (
-        datetime.fromtimestamp(exp, tz=timezone.utc)
-        if exp
-        else datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
+    user_id, jti, expires_at = _decode_access_payload(token)
 
     if not await is_token_revoked(jti, db):
         await revoke_token(jti=jti, expires_at=expires_at, db=db)
 
-    await log_auth_event(
-        user_id=user_id,
-        event_type="logout",
-        ip_address=ip_address,
-        detail=None,
-        db=db,
-    )
+    await log_auth_event(user_id=user_id, event_type="logout", ip_address=ip_address, detail=None, db=db)
 
 
 # ── Registro ──────────────────────────────────────────────────────────────────
@@ -172,7 +162,6 @@ async def register_user(
     db: AsyncSession,
     terms_version: str = "1.0",
 ) -> User:
-    """Cadastra um novo usuário com hash Argon2id e salt único."""
     existing_matricula = await db.execute(select(User).where(User.matricula == matricula))
     if existing_matricula.scalar_one_or_none() is not None:
         raise ValueError("Já existe uma conta com esta matrícula")
@@ -208,7 +197,6 @@ async def login_user(
     db: AsyncSession,
     ip_address: str | None = None,
 ) -> str:
-    """Verifica as credenciais e retorna o token temporário pré-2FA."""
     result = await db.execute(select(User).where(User.email == email))
     user: User | None = result.scalar_one_or_none()
 
@@ -261,7 +249,6 @@ async def verify_2fa_and_issue_token(
     db: AsyncSession,
     ip_address: str | None = None,
 ) -> str:
-    """Valida o código TOTP e emite o JWT final de acesso."""
     user_id = decode_temp_token(temp_token)
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -467,18 +454,10 @@ async def delete_user_account(
 
     # 2. Invalida o token atual
     try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        jti: str = payload.get("jti", "")
-        exp = payload.get("exp")
-        if jti:
-            expires_at = (
-                datetime.fromtimestamp(exp, tz=timezone.utc)
-                if exp
-                else datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-            )
-            if not await is_token_revoked(jti, db):
-                await revoke_token(jti=jti, expires_at=expires_at, db=db)
-    except JWTError:
+        _, jti, expires_at = _decode_access_payload(token)
+        if not await is_token_revoked(jti, db):
+            await revoke_token(jti=jti, expires_at=expires_at, db=db)
+    except ValueError:
         logger.warning("Token already expired during account deletion for user %s — skipping revocation", user_id)
 
     # 3. Apaga arquivos físicos do Supabase Storage (pasta inteira do usuário)
@@ -509,7 +488,6 @@ async def reset_password(
     db: AsyncSession,
     ip_address: str | None = None,
 ) -> None:
-    """Valida o token e aplica o novo hash de senha."""
     token_hash = _hash_reset_token(token)
     now = datetime.now(timezone.utc)
 
