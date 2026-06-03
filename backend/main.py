@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -11,14 +12,20 @@ from backend.database.db import init_db
 from backend.limiter import limiter
 from backend.routers import auth, files
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 BIM Repository Auth Backend starting…")
+    logger.info("BIM Repository Auth Backend starting")
     await init_db()
-    print("✅ Database tables verified/created.")
+    logger.info("Database tables verified/created")
     yield
-    print("🛑 BIM Repository Auth Backend shutting down.")
+    logger.info("BIM Repository Auth Backend shutting down")
 
 
 app = FastAPI(

@@ -1,43 +1,43 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # BIM Repository Auth Backend — Python Dependencies
-# Install with: pip install -r requirements.txt
+# Install:        pip install -r requirements.txt
+# Regenerate hashes (supply chain security):
+#   pip-compile --generate-hashes requirements.in -o requirements.txt
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Web framework
 fastapi==0.111.0
-uvicorn[standard]==0.29.0          # ASGI server with WebSocket & HTTP/2 support
+uvicorn[standard]==0.29.0
 
 # Database (async PostgreSQL)
-sqlalchemy==2.0.30                 # ORM with async support
-greenlet==3.4.0                    # Required by SQLAlchemy async engine (not auto-installed on all platforms)
-asyncpg==0.29.0                    # Async PostgreSQL driver (fastest available)
-alembic==1.13.1                    # Database migration tool
+sqlalchemy==2.0.30
+greenlet==3.4.0                    # Required by SQLAlchemy async engine on some platforms
+asyncpg==0.29.0
+alembic==1.13.1
 
-# Password hashing — Argon2 (winner of the Password Hashing Competition 2015)
-argon2-cffi==23.1.0                # Python bindings for libargon2
+# Password hashing — Argon2id (Password Hashing Competition winner)
+argon2-cffi==23.1.0
 
-# JWT authentication
-python-jose[cryptography]==3.3.0   # JWT encode/decode with RS256/HS256 support
+# Cryptography — AES-256-GCM (crypto_service) + JWT (python-jose dependency)
+cryptography==42.0.8
+python-jose[cryptography]==3.3.0
 
 # 2FA / TOTP
-pyotp==2.9.0                       # RFC 6238 TOTP implementation
-qrcode[pil]==7.4.2                 # QR Code generation; [pil] adds image support
-Pillow==10.3.0                     # Image processing (required by qrcode[pil])
+pyotp==2.9.0
+qrcode[pil]==7.4.2
+Pillow==10.3.0
 
 # Configuration & environment variables
-python-dotenv==1.0.1               # Load .env files into os.environ
-pydantic==2.7.1                    # Data validation (used by FastAPI)
-pydantic-settings==2.2.1           # Settings management from env vars
+python-dotenv==1.0.1
+pydantic==2.7.1
+pydantic-settings==2.2.1
 
 # HTTP utilities / security
 python-multipart==0.0.9            # Required for form data / file uploads in FastAPI
 passlib==1.7.4                     # Compatibility shim used internally by python-jose
 
-# Async file I/O — used for writing uploaded BIM files to disk
-aiofiles==23.2.1
-
-# Rate limiting — proteção contra força bruta em endpoints de autenticação
+# Rate limiting — brute-force protection on auth endpoints
 slowapi==0.1.9
 
-# HTTP client — usado para comunicação com Supabase Storage
+# HTTP client — Supabase Storage communication
 httpx==0.27.0
