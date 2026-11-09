@@ -17,7 +17,7 @@ const ACTION_LABELS = {
   upload:   { label: 'Enviou arquivo',       icon: <Upload size={16} />, color: 'var(--accent)' },
   download: { label: 'Baixou arquivo',        icon: <Download size={16} />, color: 'var(--success)' },
   delete:   { label: 'Excluiu arquivo',       icon: <Trash2 size={16} />, color: 'var(--error)' },
-  share:    { label: 'Compartilhou arquivo',  icon: <Share2 size={16} />, color: '#7a9cf0' },
+  share:    { label: 'Compartilhou arquivo',  icon: <Share2 size={16} />, color: 'var(--text-primary)' },
   revoke:   { label: 'Revogou acesso',        icon: <XCircle size={16} />, color: 'var(--text-muted)' },
 }
 

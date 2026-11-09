@@ -14,7 +14,7 @@ function getStrength(pw) {
 }
 
 const STRENGTH_LABELS = ['Muito fraca', 'Fraca', 'Boa', 'Forte']
-const STRENGTH_COLORS = ['#e05a5a', '#e07a5a', '#c9a55a', '#5abf8a']
+const STRENGTH_COLORS = ['#A3392B', '#B5651D', '#8A6420', '#374336']
 
 export default function Register() {
   const navigate = useNavigate()
@@ -85,10 +85,10 @@ export default function Register() {
           <div className="brand-content">
             <div className="brand-badge">
               <span className="brand-badge-dot" />
-              Repositório BIM Seguro
+              Repositório BIM seguro
             </div>
             <h1 className="brand-title">
-              Arquitetura &<br /><span>Urbanismo</span><br />Digital
+              Arquitetura &amp;<br /><span>urbanismo digital</span>
             </h1>
             <p className="brand-subtitle">
               Gerencie projetos BIM com segurança de nível corporativo.

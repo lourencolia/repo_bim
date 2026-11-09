@@ -13,9 +13,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     TOTP_ISSUER_NAME: str = "BIM Repository"
 
-    # Supabase Storage
-    SUPABASE_URL: str
-    SUPABASE_SERVICE_KEY: str
+    # Armazenamento dos arquivos: "supabase" (produção) ou "local" (desenvolvimento,
+    # grava em backend/uploads/ — os arquivos já chegam cifrados com AES-256-GCM)
+    STORAGE_BACKEND: str = "supabase"
+
+    # Supabase Storage — obrigatório quando STORAGE_BACKEND=supabase
+    SUPABASE_URL: str = ""
+    SUPABASE_SERVICE_KEY: str = ""
     STORAGE_BUCKET: str = "bim-files"
 
     # CORS — use "*" for development, comma-separated URLs for production

@@ -1,9 +1,32 @@
+import shutil
+from pathlib import Path
+
 import httpx
 from backend.config import settings
 
 
 class StorageError(ValueError):
     pass
+
+
+# ── Modo local (desenvolvimento) ──────────────────────────────────────────────
+# Ativado com STORAGE_BACKEND=local. Mesma interface do Supabase, gravando em
+# backend/uploads/{owner_id}/{stored_name}. Os bytes já chegam cifrados.
+
+_LOCAL_ROOT = Path(__file__).resolve().parent.parent / "uploads"
+
+
+def _is_local() -> bool:
+    return settings.STORAGE_BACKEND.lower() == "local"
+
+
+def _local_path(owner_id: str, stored_name: str) -> Path:
+    # Os nomes vêm do próprio servidor (UUIDs), mas garantimos que o caminho
+    # final fique dentro da pasta de uploads.
+    path = (_LOCAL_ROOT / owner_id / stored_name).resolve()
+    if _LOCAL_ROOT.resolve() not in path.parents:
+        raise StorageError("Caminho de arquivo inválido")
+    return path
 
 
 def _url(path: str) -> str:
@@ -15,6 +38,12 @@ def _auth_headers() -> dict:
 
 
 async def upload_to_storage(owner_id: str, stored_name: str, data: bytes) -> None:
+    if _is_local():
+        destino = _local_path(owner_id, stored_name)
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(data)
+        return
+
     path = f"{owner_id}/{stored_name}"
     async with httpx.AsyncClient() as client:
         try:
@@ -45,6 +74,12 @@ async def delete_folder_from_storage(owner_id: str) -> None:
     chamada HTTP apaga toda a pasta. Retorna sem erro se a pasta não existir
     (usuário sem arquivos é um estado válido).
     """
+    if _is_local():
+        pasta = (_LOCAL_ROOT / owner_id).resolve()
+        if _LOCAL_ROOT.resolve() in pasta.parents and pasta.exists():
+            shutil.rmtree(pasta)
+        return
+
     url = f"{settings.SUPABASE_URL}/storage/v1/object/{settings.STORAGE_BUCKET}"
     async with httpx.AsyncClient() as client:
         try:
@@ -66,6 +101,12 @@ async def delete_folder_from_storage(owner_id: str) -> None:
 
 
 async def download_from_storage(owner_id: str, stored_name: str) -> bytes:
+    if _is_local():
+        origem = _local_path(owner_id, stored_name)
+        if not origem.exists():
+            raise ValueError("Arquivo não encontrado no servidor")
+        return origem.read_bytes()
+
     path = f"{owner_id}/{stored_name}"
     async with httpx.AsyncClient() as client:
         try:

@@ -2,12 +2,23 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Crect width=%2724%27 height=%2724%27 fill=%27%23121212%27/%3E%3Cline x1=%2712%27 y1=%273%27 x2=%2712%27 y2=%279%27 stroke=%27%23E3E1DC%27 stroke-width=%271.5%27/%3E%3Cpath d=%27M8.5 9h7L12 21z%27 fill=%27%23E3E1DC%27/%3E%3C/svg%3E" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BIM Repository — Autenticação Segura</title>
-    <meta name="description" content="Sistema seguro de autenticação para o repositório de projetos BIM do escritório de Arquitetura e Urbanismo." />
+    <title>Prumo — Repositório seguro de projetos BIM</title>
+    <meta name="description" content="Prumo: repositório seguro de projetos BIM, com autenticação em duas etapas e compartilhamento controlado." />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <script>
+      // Aplica tema e cor de destaque salvos antes de a página aparecer
+      // (mesma lógica de src/aparencia.js)
+      (function () {
+        var tema = localStorage.getItem('prumo-tema') || 'system'
+        var escuro = tema === 'system' ? window.matchMedia('(prefers-color-scheme: dark)').matches : tema === 'dark'
+        document.documentElement.dataset.theme = escuro ? 'dark' : 'light'
+        document.documentElement.dataset.accent = localStorage.getItem('prumo-destaque') || 'laranja'
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

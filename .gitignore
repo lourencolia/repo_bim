@@ -28,3 +28,6 @@ frontend/node_modules/
 # IDEs
 .vscode/
 .idea/
+
+# Banco local de desenvolvimento (pgserver)
+backend/.pgdata/

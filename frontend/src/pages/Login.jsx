@@ -47,10 +47,10 @@ export default function Login() {
         <div className="brand-content">
           <div className="brand-badge">
             <span className="brand-badge-dot" />
-            Repositório BIM Seguro
+            Repositório BIM seguro
           </div>
           <h1 className="brand-title">
-            Acesso ao<br /><span>Repositório</span><br />de Projetos
+            Seus projetos,<br /><span>sempre no prumo.</span>
           </h1>
           <p className="brand-subtitle">
             Autenticação em duas etapas protege seus projetos BIM 

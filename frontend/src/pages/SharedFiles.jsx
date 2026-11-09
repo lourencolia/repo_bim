@@ -68,7 +68,7 @@ export default function SharedFiles() {
                 <tr key={f.share_id}>
                   <td>
                     <div className="file-cell">
-                      <span className="file-cell-icon">{fileIcon(f.original_filename)}</span>
+                      <span className="file-cell-icon" data-ext={f.original_filename.split(".").pop().toLowerCase()}>{fileIcon(f.original_filename)}</span>
                       <div>
                         <div className="file-cell-name">{f.original_filename}</div>
                         {f.description && (

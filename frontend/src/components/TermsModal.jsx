@@ -15,7 +15,7 @@ export default function TermsModal({ onClose }) {
           <section className="terms-section">
             <h4>1. Sobre o sistema</h4>
             <p>
-              O Repositório BIM é um sistema acadêmico destinado exclusivamente a alunos
+              O Prumo é um sistema acadêmico destinado exclusivamente a alunos
               regularmente matriculados na instituição. Seu objetivo é armazenar, organizar e
               facilitar o compartilhamento controlado de projetos em formato BIM (Building
               Information Modeling) entre membros da comunidade universitária.

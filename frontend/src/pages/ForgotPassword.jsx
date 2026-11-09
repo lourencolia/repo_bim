@@ -40,10 +40,10 @@ export default function ForgotPassword() {
         <div className="brand-content">
           <div className="brand-badge">
             <span className="brand-badge-dot" />
-            Repositório BIM Seguro
+            Repositório BIM seguro
           </div>
           <h1 className="brand-title">
-            Recuperar<br /><span>Acesso</span><br />à Conta
+            Recuperar<br /><span>acesso à conta</span>
           </h1>
           <p className="brand-subtitle">
             Informe seu e-mail cadastrado. Você receberá um link
@@ -83,8 +83,8 @@ export default function ForgotPassword() {
           {resetToken ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div className="alert" style={{
-                background: 'rgba(16, 185, 129, 0.1)',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
+                background: 'var(--success-bg)',
+                border: '1px solid var(--success-line)',
                 borderRadius: 'var(--radius-sm)',
                 padding: '12px 16px',
                 display: 'flex',
@@ -92,7 +92,7 @@ export default function ForgotPassword() {
                 gap: '10px',
                 color: 'var(--text-primary)',
               }}>
-                <CheckCircle size={16} style={{ color: '#10b981', flexShrink: 0, marginTop: '2px' }} />
+                <CheckCircle size={16} style={{ color: 'var(--success)', flexShrink: 0, marginTop: '2px' }} />
                 <span style={{ fontSize: '14px', lineHeight: '1.5' }}>
                   Solicitação registrada. Em produção, o token chegaria por e-mail.
                   Para fins de demonstração, o token está disponível abaixo.

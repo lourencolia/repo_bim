@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { getMe } from '../services/api'
-import { LayoutDashboard, FolderClosed, Share2, Upload, User, Building2, Menu, X, LogOut } from 'lucide-react'
+import { LayoutDashboard, FolderClosed, Share2, Upload, User, Settings, Menu, X, LogOut } from 'lucide-react'
+import Logo from './Logo'
+import ThemeToggle from './ThemeToggle'
 
 const NAV_LINKS = [
   { to: '/home',    icon: <LayoutDashboard size={18} />, label: 'Dashboard'      },
@@ -9,6 +11,7 @@ const NAV_LINKS = [
   { to: '/shared',  icon: <Share2 size={18} />,          label: 'Compartilhados' },
   { to: '/upload',  icon: <Upload size={18} />,          label: 'Novo Upload'    },
   { to: '/profile', icon: <User size={18} />,            label: 'Meu Perfil'     },
+  { to: '/settings', icon: <Settings size={18} />,       label: 'Configurações'  },
 ]
 
 export default function DashLayout({ children }) {
@@ -48,8 +51,8 @@ export default function DashLayout({ children }) {
           </button>
 
           <div className="dash-nav-logo">
-            <div className="dash-nav-logo-icon"><Building2 size={20} color="white" /></div>
-            BIM Repository
+            <div className="dash-nav-logo-icon"><Logo size={18} /></div>
+            Prumo
           </div>
         </div>
 
@@ -60,6 +63,7 @@ export default function DashLayout({ children }) {
               <span className="dash-user-meta">{user.course} · {user.matricula}</span>
             </Link>
           )}
+          <ThemeToggle />
           <button className="btn-logout" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <LogOut size={16} /> Sair
           </button>

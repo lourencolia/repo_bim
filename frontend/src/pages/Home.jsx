@@ -85,7 +85,7 @@ export default function Home() {
         <div className="file-list" style={{ marginBottom: '2rem' }}>
           {recentMine.map(f => (
             <div key={f.id} className="file-row-simple">
-              <span className="file-row-icon">{fileIcon(f.original_filename)}</span>
+              <span className="file-row-icon" data-ext={f.original_filename.split(".").pop().toLowerCase()}>{fileIcon(f.original_filename)}</span>
               <div className="file-row-info">
                 <span className="file-row-name">{f.original_filename}</span>
                 {f.description && <span className="file-row-desc">{f.description}</span>}
@@ -107,7 +107,7 @@ export default function Home() {
           <div className="file-list">
             {recentShared.map(f => (
               <div key={f.share_id} className="file-row-simple">
-                <span className="file-row-icon">{fileIcon(f.original_filename)}</span>
+                <span className="file-row-icon" data-ext={f.original_filename.split(".").pop().toLowerCase()}>{fileIcon(f.original_filename)}</span>
                 <div className="file-row-info">
                   <span className="file-row-name">{f.original_filename}</span>
                   <span className="file-row-desc">por {f.shared_by_name} · {f.shared_by_matricula}</span>

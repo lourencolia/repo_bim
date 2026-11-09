@@ -9,8 +9,10 @@ import MyFiles     from './pages/MyFiles'
 import SharedFiles from './pages/SharedFiles'
 import Upload      from './pages/Upload'
 import Profile     from './pages/Profile'
+import Settings    from './pages/Settings'
 import NotFound    from './pages/NotFound'
 import PrivateRoute from './components/PrivateRoute'
+import ThemeToggle from './components/ThemeToggle'
 
 function Protected({ children }) {
   return <PrivateRoute>{children}</PrivateRoute>
@@ -19,9 +21,8 @@ function Protected({ children }) {
 export default function App() {
   return (
     <>
-      {/* Ambient background blobs */}
-      <div className="liquid-bg" />
-      <div className="liquid-blob-cyan" />
+      {/* Botão de tema nas telas de acesso (no painel ele fica na barra superior) */}
+      <ThemeToggle floating />
 
       <BrowserRouter>
         <Routes>
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/shared"  element={<Protected><SharedFiles /></Protected>} />
           <Route path="/upload"  element={<Protected><Upload /></Protected>} />
           <Route path="/profile" element={<Protected><Profile /></Protected>} />
+          <Route path="/settings" element={<Protected><Settings /></Protected>} />
 
           {/* Default + 404 */}
           <Route path="/" element={<Navigate to="/login" replace />} />

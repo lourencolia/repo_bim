@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("BIM Repository Auth Backend starting")
+    logger.info("Prumo API starting")
     await init_db()
     logger.info("Database tables verified/created")
     yield
@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="BIM Repository — Authentication API",
+    title="Prumo — Authentication API",
     version="1.0.0",
     lifespan=lifespan,
 )

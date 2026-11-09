@@ -59,10 +59,10 @@ export default function ResetPassword() {
         <div className="brand-content">
           <div className="brand-badge">
             <span className="brand-badge-dot" />
-            Repositório BIM Seguro
+            Repositório BIM seguro
           </div>
           <h1 className="brand-title">
-            Redefinir<br /><span>Nova</span><br />Senha
+            Defina uma<br /><span>nova senha</span>
           </h1>
           <p className="brand-subtitle">
             Cole o token recebido e defina uma nova senha segura para sua conta.
@@ -95,7 +95,7 @@ export default function ResetPassword() {
           {success ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center' }}>
-                <CheckCircle size={48} style={{ color: '#10b981' }} />
+                <CheckCircle size={48} style={{ color: 'var(--success)' }} />
               </div>
               <p style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '16px' }}>
                 Senha redefinida com sucesso!
